@@ -1,0 +1,86 @@
+name: Compilar WoW Network Optimizer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    name: Compilar Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v6
+
+      - name: Buscar ZIP del proyecto
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter "*.zip" -File | Select-Object -First 1
+
+          if (-not $zip) {
+            Write-Error "No se encontró el ZIP del proyecto."
+            exit 1
+          }
+
+          Write-Host "ZIP encontrado: $($zip.FullName)"
+
+          Expand-Archive -Path $zip.FullName -DestinationPath "$env:GITHUB_WORKSPACE\source" -Force
+
+      - name: Encontrar proyecto .NET
+        shell: powershell
+        run: |
+          $project = Get-ChildItem `
+            -Path "$env:GITHUB_WORKSPACE\source" `
+            -Filter "*.csproj" `
+            -File `
+            -Recurse | Select-Object -First 1
+
+          if (-not $project) {
+            Write-Error "No se encontró ningún archivo .csproj."
+            exit 1
+          }
+
+          Write-Host "Proyecto encontrado:"
+          Write-Host $project.FullName
+
+          "PROJECT_PATH=$($project.FullName)" >> $env:GITHUB_ENV
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restaurar dependencias
+        shell: powershell
+        run: |
+          dotnet restore "$env:PROJECT_PATH"
+
+      - name: Compilar y publicar EXE
+        shell: powershell
+        run: |
+          dotnet publish "$env:PROJECT_PATH" `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            /p:PublishSingleFile=true `
+            /p:IncludeNativeLibrariesForSelfExtract=true `
+            /p:DebugType=None `
+            -o "$env:GITHUB_WORKSPACE\publish"
+
+      - name: Mostrar resultado
+        shell: powershell
+        run: |
+          Write-Host "========================================"
+          Write-Host "COMPILACION TERMINADA"
+          Write-Host "========================================"
+          Get-ChildItem "$env:GITHUB_WORKSPACE\publish"
+
+      - name: Guardar programa compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: WoWNetworkOptimizer-Windows-x64
+          path: publish
+          retention-days: 7
