@@ -13,12 +13,12 @@ jobs:
 
     steps:
       - name: Descargar repositorio
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Buscar ZIP del proyecto
-        shell: powershell
+        shell: pwsh
         run: |
-          $zip = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter "*.zip" -File | Select-Object -First 1
+          $zip = Get-ChildItem -Path "$env:GITHUB_WORKSPACE" -Filter "*.zip" -File | Select-Object -First 1
 
           if (-not $zip) {
             Write-Error "No se encontró el ZIP del proyecto."
@@ -27,16 +27,22 @@ jobs:
 
           Write-Host "ZIP encontrado: $($zip.FullName)"
 
-          Expand-Archive -Path $zip.FullName -DestinationPath "$env:GITHUB_WORKSPACE\source" -Force
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\source" | Out-Null
+
+          Expand-Archive `
+            -Path $zip.FullName `
+            -DestinationPath "$env:GITHUB_WORKSPACE\source" `
+            -Force
 
       - name: Encontrar proyecto .NET
-        shell: powershell
+        shell: pwsh
         run: |
           $project = Get-ChildItem `
             -Path "$env:GITHUB_WORKSPACE\source" `
             -Filter "*.csproj" `
             -File `
-            -Recurse | Select-Object -First 1
+            -Recurse |
+            Select-Object -First 1
 
           if (-not $project) {
             Write-Error "No se encontró ningún archivo .csproj."
@@ -49,22 +55,22 @@ jobs:
           "PROJECT_PATH=$($project.FullName)" >> $env:GITHUB_ENV
 
       - name: Configurar .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
-      - name: Instalar System.Management
-        shell: powershell
+      - name: Instalar dependencia System.Management
+        shell: pwsh
         run: |
           dotnet add "$env:PROJECT_PATH" package System.Management --version 8.0.0
 
       - name: Restaurar dependencias
-        shell: powershell
+        shell: pwsh
         run: |
           dotnet restore "$env:PROJECT_PATH"
 
       - name: Compilar y publicar EXE
-        shell: powershell
+        shell: pwsh
         run: |
           dotnet publish "$env:PROJECT_PATH" `
             -c Release `
@@ -76,12 +82,13 @@ jobs:
             -o "$env:GITHUB_WORKSPACE\publish"
 
       - name: Mostrar resultado
-        shell: powershell
+        shell: pwsh
         run: |
           Write-Host "=========================================="
           Write-Host "COMPILACION TERMINADA"
           Write-Host "=========================================="
-          Get-ChildItem "$env:GITHUB_WORKSPACE\publish"
+
+          Get-ChildItem "$env:GITHUB_WORKSPACE\publish" -Recurse
 
       - name: Guardar programa compilado
         uses: actions/upload-artifact@v4
