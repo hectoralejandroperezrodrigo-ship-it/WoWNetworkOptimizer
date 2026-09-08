@@ -53,6 +53,11 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Instalar System.Management
+        shell: powershell
+        run: |
+          dotnet add "$env:PROJECT_PATH" package System.Management --version 8.0.0
+
       - name: Restaurar dependencias
         shell: powershell
         run: |
@@ -73,9 +78,9 @@ jobs:
       - name: Mostrar resultado
         shell: powershell
         run: |
-          Write-Host "========================================"
+          Write-Host "=========================================="
           Write-Host "COMPILACION TERMINADA"
-          Write-Host "========================================"
+          Write-Host "=========================================="
           Get-ChildItem "$env:GITHUB_WORKSPACE\publish"
 
       - name: Guardar programa compilado
